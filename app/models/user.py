@@ -23,6 +23,8 @@ class User(Base, TimestampMixin):
     full_name = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.employee, nullable=False)
     is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False, nullable=False)
+    future_time_log_enabled = Column(Boolean, default=False, nullable=False)
 
     company = relationship("Company", back_populates="users")
     time_entries = relationship("TimeEntry", back_populates="user")

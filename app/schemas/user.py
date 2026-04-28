@@ -10,5 +10,7 @@ class UserResponse(BaseModel):
     role: UserRole
     company_id: UUID
     is_active: bool
+    is_superuser: bool
+    future_time_log_enabled: bool
 
     model_config = {"from_attributes": True}

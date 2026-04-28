@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, date, time, timezone
+from datetime import datetime, date, time, timezone, timedelta
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.time_entry import TimeEntry, EntryType
-from app.models.user import User
+from app.models.user import User, UserRole
 from uuid import UUID
 from app.schemas.time_entry import (
     ClockInRequest,
@@ -16,6 +16,23 @@ from app.schemas.time_entry import (
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/time-entries", tags=["time-entries"])
+
+
+def _week_start(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def _check_date_allowed(entry_date: date, user: User) -> None:
+    if user.is_superuser or user.role == UserRole.admin:
+        return
+    today = date.today()
+    current_week = _week_start(today)
+    last_week = current_week - timedelta(weeks=1)
+    entry_week = _week_start(entry_date)
+    if entry_week < last_week:
+        raise HTTPException(status_code=403, detail="Cannot log time more than one week in the past")
+    if entry_week > current_week and not user.future_time_log_enabled:
+        raise HTTPException(status_code=403, detail="Future week time logging is not enabled for your account")
 
 
 @router.post("/clock-in", response_model=TimeEntryResponse, status_code=status.HTTP_201_CREATED)
@@ -106,6 +123,8 @@ def create_manual_entry(
     if payload.clock_out <= payload.clock_in:
         raise HTTPException(status_code=400, detail="clock_out must be after clock_in")
 
+    _check_date_allowed(payload.clock_in.date(), current_user)
+
     entry = TimeEntry(
         user_id=current_user.id,
         company_id=current_user.company_id,
@@ -136,6 +155,7 @@ def update_entry(
         raise HTTPException(status_code=404, detail="Entry not found")
 
     if payload.clock_in is not None:
+        _check_date_allowed(payload.clock_in.date(), current_user)
         entry.clock_in = payload.clock_in
     if payload.clock_out is not None:
         entry.clock_out = payload.clock_out
