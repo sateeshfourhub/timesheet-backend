@@ -22,17 +22,23 @@ def _week_start(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
+FUTURE_WEEKS_LIMIT = 4
+
+
 def _check_date_allowed(entry_date: date, user: User) -> None:
     if user.is_superuser or user.role == UserRole.admin:
         return
     today = date.today()
     current_week = _week_start(today)
     last_week = current_week - timedelta(weeks=1)
+    max_future_week = current_week + timedelta(weeks=FUTURE_WEEKS_LIMIT)
     entry_week = _week_start(entry_date)
     if entry_week < last_week:
         raise HTTPException(status_code=403, detail="Cannot log time more than one week in the past")
     if entry_week > current_week and not user.future_time_log_enabled:
         raise HTTPException(status_code=403, detail="Future week time logging is not enabled for your account")
+    if entry_week > max_future_week:
+        raise HTTPException(status_code=403, detail=f"Cannot log time more than {FUTURE_WEEKS_LIMIT} weeks into the future")
 
 
 @router.post("/clock-in", response_model=TimeEntryResponse, status_code=status.HTTP_201_CREATED)
