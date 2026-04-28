@@ -28,3 +28,7 @@ class User(Base, TimestampMixin):
 
     company = relationship("Company", back_populates="users")
     time_entries = relationship("TimeEntry", back_populates="user")
+
+    @property
+    def company_name(self) -> str | None:
+        return self.company.name if self.company else None

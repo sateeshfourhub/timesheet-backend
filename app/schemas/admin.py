@@ -9,6 +9,7 @@ class CreateUserRequest(BaseModel):
     password: str
     full_name: str
     role: UserRole = UserRole.employee
+    company_id: Optional[UUID] = None
 
 
 class UpdateUserRequest(BaseModel):

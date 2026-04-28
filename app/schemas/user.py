@@ -9,6 +9,7 @@ class UserResponse(BaseModel):
     full_name: str
     role: UserRole
     company_id: UUID
+    company_name: str | None = None
     is_active: bool
     is_superuser: bool
     future_time_log_enabled: bool
