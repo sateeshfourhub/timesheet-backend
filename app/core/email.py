@@ -37,7 +37,7 @@ def _entry_rows(entries: list) -> str:
         start = e.clock_in.strftime("%I:%M %p")
         end = e.clock_out.strftime("%I:%M %p") if e.clock_out else "—"
         brk = f"{e.break_minutes}m" if e.break_minutes else "—"
-        net = e.net_work_minutes or 0
+        net = max(0, (e.clock_out - e.clock_in).total_seconds() / 60 - (e.break_minutes or 0)) if e.clock_out else 0
         net_str = f"{int(net // 60)}h {int(net % 60)}m" if net else "—"
         rows += f"""
         <tr>

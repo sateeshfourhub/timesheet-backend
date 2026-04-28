@@ -65,9 +65,15 @@ def submit_week(
     if not entries:
         raise HTTPException(status_code=400, detail="No completed entries found for this week. Log your hours first.")
 
-    total_net = sum(e.net_work_minutes or 0 for e in entries)
+    def _duration(e):
+        return (e.clock_out - e.clock_in).total_seconds() / 60 if e.clock_out else 0
+
+    def _net(e):
+        return max(0, _duration(e) - (e.break_minutes or 0))
+
+    total_gross = sum(_duration(e) for e in entries)
     total_break = sum(e.break_minutes or 0 for e in entries)
-    total_gross = sum(e.duration_minutes or 0 for e in entries)
+    total_net = sum(_net(e) for e in entries)
     totals = {"net": total_net, "break": total_break, "gross": total_gross}
 
     # Record the submission
