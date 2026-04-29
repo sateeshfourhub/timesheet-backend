@@ -15,6 +15,10 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://localhost:3000",
         "https://timesheet.fourhubtech.com",
+        "https://dev.timekeepinghub.com",
+        "https://qa.timekeepinghub.com",
+        "https://preview.timekeepinghub.com",
+        "https://timekeepinghub.com",
     ]
 
     # Email (SMTP) — leave blank to disable email sending
