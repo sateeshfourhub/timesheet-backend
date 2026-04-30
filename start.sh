@@ -11,8 +11,7 @@ alembic upgrade head
 echo "=== Migrations Complete ==="
 
 echo "=== Seeding Default Data ==="
-python -c "from app.core.seed import seed_superadmin; seed_superadmin()"
-echo "=== Seeding Complete ==="
+python -c "from app.core.seed import seed_superadmin; seed_superadmin()" || echo "=== Seed skipped (already seeded or non-fatal error) ==="
 
 echo "=== Starting Uvicorn on port ${PORT:-8000} ==="
 exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
