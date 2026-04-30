@@ -11,5 +11,6 @@ dist/
 build/
 .env
 .env.*
+!.env.*.example
 *.sqlite
 *.db
