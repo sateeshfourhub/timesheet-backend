@@ -24,3 +24,12 @@ class EmployeeRegisterRequest(BaseModel):
     email: EmailStr
     password: str
     company_slug: str
+
+
+class CompanyRegisterRequest(BaseModel):
+    full_name: str
+    email: EmailStr
+    password: str
+    company_name: str
+    company_slug: str
+    super_admin_token: str
