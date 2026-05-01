@@ -17,3 +17,10 @@ class RegisterRequest(BaseModel):
     full_name: str
     company_name: str
     company_slug: str
+
+
+class EmployeeRegisterRequest(BaseModel):
+    full_name: str
+    email: EmailStr
+    password: str
+    company_slug: str
