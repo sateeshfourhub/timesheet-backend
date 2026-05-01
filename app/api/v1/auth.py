@@ -5,18 +5,24 @@ from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.models.company import Company
 from app.models.user import User, UserRole
+from datetime import datetime, timezone
 from app.schemas.auth import LoginRequest, TokenResponse, RegisterRequest, EmployeeRegisterRequest, CompanyRegisterRequest
 from app.schemas.user import UserResponse
 from app.api.deps import get_current_user
-from app.core.config import settings
+from app.models.invite_token import InviteToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: CompanyRegisterRequest, db: Session = Depends(get_db)):
-    if not settings.SUPER_ADMIN_TOKEN or payload.super_admin_token != settings.SUPER_ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Invalid super admin token")
+    invite = db.query(InviteToken).filter(InviteToken.token == payload.super_admin_token).first()
+    if not invite:
+        raise HTTPException(status_code=403, detail="Invalid invite token")
+    if invite.is_used:
+        raise HTTPException(status_code=403, detail="Invite token already used")
+    if invite.is_expired:
+        raise HTTPException(status_code=403, detail="Invite token has expired")
 
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -37,6 +43,9 @@ def register(payload: CompanyRegisterRequest, db: Session = Depends(get_db)):
         role=UserRole.admin,
     )
     db.add(user)
+
+    invite.used_at = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(user)
 
