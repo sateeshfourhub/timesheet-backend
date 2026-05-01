@@ -1,13 +1,17 @@
+import secrets
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 from app.api.deps import get_db, require_admin
 from app.models.user import User, UserRole
 from app.models.company import Company
+from app.models.invite_token import InviteToken
 from app.schemas.admin import CreateUserRequest, UpdateUserRequest, BatchFutureAccessRequest
 from app.schemas.user import UserResponse
 from app.core.security import get_password_hash
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -91,6 +95,60 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+class InviteTokenRequest(BaseModel):
+    company_name: Optional[str] = None
+
+
+@router.post("/invite-tokens", status_code=201)
+def create_invite_token(
+    payload: InviteTokenRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if not current_user.is_superuser:
+        raise HTTPException(403, "Superadmin only")
+
+    token = InviteToken(
+        token=secrets.token_hex(32),
+        company_name=payload.company_name,
+        created_by=current_user.id,
+    )
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+
+    return {
+        "token": token.token,
+        "company_name": token.company_name,
+        "expires_at": token.expires_at.isoformat(),
+        "created_at": token.created_at.isoformat(),
+    }
+
+
+@router.get("/invite-tokens")
+def list_invite_tokens(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if not current_user.is_superuser:
+        raise HTTPException(403, "Superadmin only")
+
+    tokens = db.query(InviteToken).order_by(InviteToken.created_at.desc()).all()
+    now = datetime.now(timezone.utc)
+
+    return [
+        {
+            "token": t.token,
+            "company_name": t.company_name,
+            "expires_at": t.expires_at.isoformat(),
+            "created_at": t.created_at.isoformat(),
+            "used_at": t.used_at.isoformat() if t.used_at else None,
+            "status": "used" if t.used_at else ("expired" if now > t.expires_at else "active"),
+        }
+        for t in tokens
+    ]
 
 
 @router.post("/users/batch-future-access")
