@@ -58,15 +58,15 @@ def run_friday_reminders():
 
 
 def start_scheduler():
-    # 8 PM IST = 14:30 UTC, every Friday
+    # 8 PM EST (UTC-5) = 01:00 UTC Saturday
     scheduler.add_job(
         run_friday_reminders,
-        CronTrigger(day_of_week="fri", hour=14, minute=30, timezone="UTC"),
+        CronTrigger(day_of_week="sat", hour=1, minute=0, timezone="UTC"),
         id="friday_reminders",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler started — Friday reminders at 14:30 UTC")
+    logger.info("Scheduler started — Friday reminders at 01:00 UTC Saturday (8 PM EST)")
 
 
 def stop_scheduler():
