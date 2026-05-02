@@ -69,8 +69,8 @@ def _base_template(heading: str, subheading: str, content: str) -> str:
         <tr>
           <td style="padding:20px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
             <p style="margin:0;color:#9ca3af;font-size:12px;">
-              This is an automated notification from TimekeepingHub.
-              Questions? Reply to this email or contact <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;">support@timekeepinghub.com</a>
+              This is an automated email — please do not reply directly to this message.<br/>
+              For questions or support, email us at <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
             </p>
           </td>
         </tr>
@@ -106,7 +106,8 @@ def send_welcome_email(user, company_name: str, company_slug: str):
     </div>
 
     <p style="color:#6b7280;font-size:13px;">
-      If you have any questions, contact your company admin or reply to this email.
+      If you have any questions, contact your company admin or email us at
+      <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
     </p>
     """
     _send(
@@ -145,7 +146,8 @@ def send_submission_confirmation(employee, week_label: str, entries: list, total
     </table>
 
     <p style="color:#6b7280;font-size:13px;margin-top:20px;">
-      Your manager has been notified. If you need to make changes, please contact your administrator.
+      Your manager has been notified. If you need to make changes, contact your administrator or email
+      <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
     </p>
     """
     _send(
