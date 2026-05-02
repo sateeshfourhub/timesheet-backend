@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date, time
 from types import SimpleNamespace
+from uuid import UUID
 from app.core.database import get_db
 from app.core.email import send_submission_confirmation, send_submission_alert_to_admin
 from app.models.time_entry import TimeEntry
 from app.models.timesheet_submission import TimesheetSubmission
 from app.models.user import User, UserRole
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/timesheets", tags=["timesheets"])
 
@@ -122,3 +123,26 @@ def submit_week(
         "days_logged": len(entries),
         "net_hours": net_str,
     }
+
+
+@router.delete("/submission")
+def unlock_week(
+    user_id: UUID = Query(...),
+    week_start: date = Query(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    query = db.query(TimesheetSubmission).filter(
+        TimesheetSubmission.user_id == user_id,
+        TimesheetSubmission.week_start == week_start,
+    )
+    if not current_user.is_superuser:
+        query = query.filter(TimesheetSubmission.company_id == current_user.company_id)
+
+    submission = query.first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="No submission found for this employee and week")
+
+    db.delete(submission)
+    db.commit()
+    return {"message": "Week unlocked. Employee can now edit their timesheet."}
