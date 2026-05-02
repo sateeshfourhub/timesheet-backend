@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date, time
 from types import SimpleNamespace
+from typing import Optional
 from uuid import UUID
 from app.core.database import get_db
 from app.core.email import send_submission_confirmation, send_submission_alert_to_admin
@@ -16,11 +17,18 @@ router = APIRouter(prefix="/timesheets", tags=["timesheets"])
 @router.get("/submission-status")
 def get_submission_status(
     week_start: date = Query(...),
+    user_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    is_admin = current_user.is_superuser or current_user.role == UserRole.admin
+    target_user_id = (
+        user_id
+        if user_id and is_admin
+        else current_user.id
+    )
     submission = db.query(TimesheetSubmission).filter(
-        TimesheetSubmission.user_id == current_user.id,
+        TimesheetSubmission.user_id == target_user_id,
         TimesheetSubmission.week_start == week_start,
     ).first()
     if submission:
