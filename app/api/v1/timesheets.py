@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date, time
+from types import SimpleNamespace
 from app.core.database import get_db
 from app.core.email import send_submission_confirmation, send_submission_alert_to_admin
 from app.models.time_entry import TimeEntry
@@ -101,10 +102,17 @@ def submit_week(
     )
     admin_email = admin.email if admin else None
 
-    background_tasks.add_task(send_submission_confirmation, current_user, week_label, entries, totals)
+    # Snapshot ORM objects into plain data before the DB session closes
+    employee_snap = SimpleNamespace(full_name=current_user.full_name, email=current_user.email)
+    entry_snaps = [
+        SimpleNamespace(clock_in=e.clock_in, clock_out=e.clock_out, break_minutes=e.break_minutes)
+        for e in entries
+    ]
+
+    background_tasks.add_task(send_submission_confirmation, employee_snap, week_label, entry_snaps, totals)
     if admin_email and admin_email != current_user.email:
         background_tasks.add_task(
-            send_submission_alert_to_admin, current_user, admin_email, week_label, entries, totals
+            send_submission_alert_to_admin, employee_snap, admin_email, week_label, entry_snaps, totals
         )
 
     net_str = f"{int(total_net // 60)}h {int(total_net % 60)}m"

@@ -1,6 +1,7 @@
 import re
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
+from types import SimpleNamespace
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.email import send_welcome_email
@@ -95,7 +96,8 @@ def employee_register(payload: EmployeeRegisterRequest, background_tasks: Backgr
     db.commit()
     db.refresh(user)
 
-    background_tasks.add_task(send_welcome_email, user, company.name, company.slug)
+    user_snap = SimpleNamespace(full_name=user.full_name, email=user.email)
+    background_tasks.add_task(send_welcome_email, user_snap, company.name, company.slug)
 
     token = create_access_token(
         {"sub": str(user.id), "company_id": str(user.company_id), "role": user.role}
