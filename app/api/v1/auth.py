@@ -1,8 +1,9 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.email import send_welcome_email
 from app.models.company import Company
 from app.models.user import User, UserRole
 from datetime import datetime, timezone
@@ -73,7 +74,7 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/employee-register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def employee_register(payload: EmployeeRegisterRequest, db: Session = Depends(get_db)):
+def employee_register(payload: EmployeeRegisterRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     company = db.query(Company).filter(Company.slug == payload.company_slug).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found. Check your company code.")
@@ -93,6 +94,8 @@ def employee_register(payload: EmployeeRegisterRequest, db: Session = Depends(ge
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    background_tasks.add_task(send_welcome_email, user, company.name, company.slug)
 
     token = create_access_token(
         {"sub": str(user.id), "company_id": str(user.company_id), "role": user.role}

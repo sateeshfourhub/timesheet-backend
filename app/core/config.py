@@ -27,13 +27,11 @@ class Settings(BaseSettings):
         "https://timekeepinghub.com",
     ]
 
-    # Email (SMTP) — leave blank to disable email sending
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_NAME: str = "Fourhub Timesheet"
-    SMTP_FROM_EMAIL: str = "noreply@fourhubtech.com"
+    # Email (Resend) — leave RESEND_API_KEY blank to disable email sending
+    RESEND_API_KEY: Optional[str] = None
+    EMAIL_FROM: str = "noreply@timekeepinghub.com"
+    EMAIL_REPLY_TO: str = "support@timekeepinghub.com"
+    EMAIL_DEV_RECIPIENT: Optional[str] = None  # if set, all emails go here instead of real recipient
 
     class Config:
         env_file = f".env.{APP_ENV}"
