@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 from types import SimpleNamespace
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.core.email import send_welcome_email
+from app.core.email import send_welcome_email, send_password_reset_email
+from app.core.config import settings
+from app.models.password_reset_token import PasswordResetToken
 from app.models.company import Company
 from app.models.user import User, UserRole
 from datetime import datetime, timezone
-from app.schemas.auth import LoginRequest, TokenResponse, RegisterRequest, EmployeeRegisterRequest, CompanyRegisterRequest
+from app.schemas.auth import LoginRequest, TokenResponse, RegisterRequest, EmployeeRegisterRequest, CompanyRegisterRequest, ForgotPasswordRequest, ResetPasswordRequest
 from app.schemas.user import UserResponse
 from app.api.deps import get_current_user
 from app.models.invite_token import InviteToken
@@ -103,3 +105,40 @@ def employee_register(payload: EmployeeRegisterRequest, background_tasks: Backgr
         {"sub": str(user.id), "company_id": str(user.company_id), "role": user.role}
     )
     return TokenResponse(access_token=token)
+
+
+@router.post("/forgot-password", status_code=204)
+def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email, User.is_active == True).first()
+    if not user:
+        return  # Never reveal whether email exists
+
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at == None,
+    ).delete(synchronize_session=False)
+
+    reset_token = PasswordResetToken.create(user.id)
+    db.add(reset_token)
+    db.commit()
+
+    reset_url = f"{settings.FRONTEND_URL}/#/reset-password?token={reset_token.token}"
+    user_snap = SimpleNamespace(full_name=user.full_name, email=user.email)
+    background_tasks.add_task(send_password_reset_email, user_snap, reset_url)
+
+
+@router.post("/reset-password", status_code=204)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == payload.token
+    ).first()
+    if not record or record.is_expired or record.is_used:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
+
+    user = db.query(User).filter(User.id == record.user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found.")
+
+    user.hashed_password = get_password_hash(payload.new_password)
+    record.used_at = datetime.now(timezone.utc)
+    db.commit()

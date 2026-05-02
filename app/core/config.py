@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "noreply@timekeepinghub.com"
     EMAIL_REPLY_TO: str = "support@timekeepinghub.com"
     EMAIL_DEV_RECIPIENT: Optional[str] = None  # if set, all emails go here instead of real recipient
+    FRONTEND_URL: str = "https://timekeepinghub.com"
 
     class Config:
         env_file = f".env.{APP_ENV}"

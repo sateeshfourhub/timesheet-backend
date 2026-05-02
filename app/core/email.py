@@ -157,6 +157,30 @@ def send_submission_confirmation(employee, week_label: str, entries: list, total
     )
 
 
+def send_password_reset_email(user, reset_url: str) -> bool:
+    first_name = user.full_name.split()[0]
+    content = f"""
+    <p style="color:#374151;font-size:15px;">Hi <strong>{first_name}</strong>,</p>
+    <p style="color:#374151;font-size:15px;">
+      We received a request to reset your password. Click the button below — this link expires in <strong>1 hour</strong>.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="{reset_url}"
+         style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">
+        Reset My Password
+      </a>
+    </div>
+    <p style="color:#6b7280;font-size:13px;">
+      If you didn't request this, you can safely ignore this email — your password won't change.
+    </p>
+    """
+    return _send(
+        to=user.email,
+        subject="Reset your TimekeepingHub password",
+        html_body=_base_template("Reset your password", "This link expires in 1 hour", content),
+    )
+
+
 def send_submission_alert_to_admin(employee, admin_email: str, week_label: str, entries: list, totals: dict):
     """Notification email to admin when an employee submits their timesheet."""
     total_net = totals["net"]
