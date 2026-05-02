@@ -1,32 +1,32 @@
-import smtplib
 import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import resend
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def send_email(to: str, subject: str, html_body: str) -> bool:
-    if not settings.SMTP_HOST or not settings.SMTP_USERNAME:
-        logger.warning("Email not configured — skipping send to %s", to)
+def _send(to: str, subject: str, html_body: str) -> bool:
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping email to %s", to)
         return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
-        msg["To"] = to
-        msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_FROM_EMAIL, to, msg.as_string())
-        logger.info("Email sent to %s: %s", to, subject)
+    recipient = settings.EMAIL_DEV_RECIPIENT or to
+    if settings.EMAIL_DEV_RECIPIENT and recipient != to:
+        logger.info("DEV MODE: redirecting email from %s to %s", to, recipient)
+
+    try:
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send({
+            "from": f"TimekeepingHub <{settings.EMAIL_FROM}>",
+            "to": [recipient],
+            "reply_to": settings.EMAIL_REPLY_TO,
+            "subject": subject,
+            "html": html_body,
+        })
+        logger.info("Email sent to %s: %s", recipient, subject)
         return True
     except Exception as e:
-        logger.error("Failed to send email to %s: %s", to, e)
+        logger.error("Failed to send email to %s: %s", recipient, e)
         return False
 
 
@@ -49,7 +49,7 @@ def _entry_rows(entries: list) -> str:
     return rows
 
 
-def _base_template(title: str, heading: str, subheading: str, content: str) -> str:
+def _base_template(heading: str, subheading: str, content: str) -> str:
     return f"""
 <!DOCTYPE html>
 <html>
@@ -58,20 +58,20 @@ def _base_template(title: str, heading: str, subheading: str, content: str) -> s
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 20px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <!-- Header -->
         <tr>
-          <td style="background:#1d4ed8;padding:28px 32px;">
-            <p style="margin:0;color:#bfdbfe;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Fourhub Timesheet</p>
+          <td style="background:linear-gradient(135deg,#1d4ed8,#1e3a8a);padding:28px 32px;">
+            <p style="margin:0;color:#bfdbfe;font-size:12px;text-transform:uppercase;letter-spacing:1px;">TimekeepingHub</p>
             <h1 style="margin:6px 0 0;color:#ffffff;font-size:22px;font-weight:700;">{heading}</h1>
             <p style="margin:6px 0 0;color:#93c5fd;font-size:14px;">{subheading}</p>
           </td>
         </tr>
-        <!-- Body -->
         <tr><td style="padding:28px 32px;">{content}</td></tr>
-        <!-- Footer -->
         <tr>
           <td style="padding:20px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated notification from Fourhub Timesheet. Please do not reply to this email.</p>
+            <p style="margin:0;color:#9ca3af;font-size:12px;">
+              This is an automated email — please do not reply directly to this message.<br/>
+              For questions or support, email us at <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
+            </p>
           </td>
         </tr>
       </table>
@@ -81,14 +81,51 @@ def _base_template(title: str, heading: str, subheading: str, content: str) -> s
 </html>"""
 
 
+def send_welcome_email(user, company_name: str, company_slug: str):
+    """Welcome email sent to a new employee after self-registration."""
+    first_name = user.full_name.split()[0]
+    content = f"""
+    <p style="color:#374151;font-size:15px;">Hi <strong>{first_name}</strong>,</p>
+    <p style="color:#374151;font-size:15px;">
+      Your account has been created and you are now part of <strong>{company_name}</strong> on TimekeepingHub.
+    </p>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px 20px;margin:20px 0;">
+      <p style="margin:0;color:#1e40af;font-size:14px;font-weight:600;">Your account details</p>
+      <p style="margin:8px 0 0;color:#1e3a8a;font-size:13px;">Email: <strong>{user.email}</strong></p>
+      <p style="margin:4px 0 0;color:#1e3a8a;font-size:13px;">Company: <strong>{company_name}</strong></p>
+    </div>
+
+    <p style="color:#374151;font-size:15px;">You can now sign in and start logging your hours:</p>
+
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://timekeepinghub.com/#/login"
+         style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">
+        Sign in to TimekeepingHub
+      </a>
+    </div>
+
+    <p style="color:#6b7280;font-size:13px;">
+      If you have any questions, contact your company admin or email us at
+      <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
+    </p>
+    """
+    _send(
+        to=user.email,
+        subject=f"Welcome to TimekeepingHub — {company_name}",
+        html_body=_base_template("Welcome to TimekeepingHub", company_name, content),
+    )
+
+
 def send_submission_confirmation(employee, week_label: str, entries: list, totals: dict):
-    """Email to the employee confirming their submission."""
+    """Confirmation email to employee after they submit their timesheet."""
     total_net = totals["net"]
     net_str = f"{int(total_net // 60)}h {int(total_net % 60)}m"
     days_logged = len([e for e in entries if e.clock_out])
+    first_name = employee.full_name.split()[0]
 
     content = f"""
-    <p style="color:#374151;font-size:15px;">Hi <strong>{employee.full_name.split()[0]}</strong>,</p>
+    <p style="color:#374151;font-size:15px;">Hi <strong>{first_name}</strong>,</p>
     <p style="color:#374151;font-size:15px;">Your timesheet for <strong>{week_label}</strong> has been successfully submitted.</p>
 
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:20px 0;">
@@ -108,18 +145,20 @@ def send_submission_confirmation(employee, week_label: str, entries: list, total
       <tbody>{_entry_rows(entries)}</tbody>
     </table>
 
-    <p style="color:#6b7280;font-size:13px;margin-top:20px;">Your manager has been notified. If you need to make changes, please contact your administrator.</p>
+    <p style="color:#6b7280;font-size:13px;margin-top:20px;">
+      Your manager has been notified. If you need to make changes, contact your administrator or email
+      <a href="mailto:support@timekeepinghub.com" style="color:#3b82f6;text-decoration:none;">support@timekeepinghub.com</a>
+    </p>
     """
-
-    send_email(
+    _send(
         to=employee.email,
         subject=f"✓ Timesheet Submitted — {week_label}",
-        html_body=_base_template("Submission Confirmed", "Timesheet Submitted", week_label, content),
+        html_body=_base_template("Timesheet Submitted", week_label, content),
     )
 
 
 def send_submission_alert_to_admin(employee, admin_email: str, week_label: str, entries: list, totals: dict):
-    """Email to admin/manager notifying of a new submission."""
+    """Notification email to admin when an employee submits their timesheet."""
     total_net = totals["net"]
     net_str = f"{int(total_net // 60)}h {int(total_net % 60)}m"
     days_logged = len([e for e in entries if e.clock_out])
@@ -164,9 +203,8 @@ def send_submission_alert_to_admin(employee, admin_email: str, week_label: str, 
       <tbody>{_entry_rows(entries)}</tbody>
     </table>
     """
-
-    send_email(
+    _send(
         to=admin_email,
-        subject=f"📋 Timesheet Submitted by {employee.full_name} — {week_label}",
-        html_body=_base_template("New Submission", f"{employee.full_name} submitted a timesheet", week_label, content),
+        subject=f"📋 Timesheet Submitted — {employee.full_name} · {week_label}",
+        html_body=_base_template(f"{employee.full_name} submitted a timesheet", week_label, content),
     )
