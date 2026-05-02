@@ -157,6 +157,36 @@ def send_submission_confirmation(employee, week_label: str, entries: list, total
     )
 
 
+def send_reminder_email(employee, week_start_formatted: str, company_name: str) -> bool:
+    first_name = employee.full_name.split()[0]
+    content = f"""
+    <p style="color:#374151;font-size:15px;">Hi <strong>{first_name}</strong>,</p>
+    <p style="color:#374151;font-size:15px;">
+      This is a friendly reminder that your timesheet for the week of
+      <strong>{week_start_formatted}</strong> has not yet been submitted.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="https://timekeepinghub.com/#/dashboard"
+         style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">
+        Submit My Timesheet
+      </a>
+    </div>
+    <p style="color:#6b7280;font-size:13px;">
+      If you have already submitted, please ignore this message.
+    </p>
+    <p style="color:#6b7280;font-size:13px;">Thanks,<br><strong>{company_name} Admin Team</strong></p>
+    """
+    return _send(
+        to=employee.email,
+        subject="Reminder: Please submit your timesheet for this week",
+        html_body=_base_template(
+            "Timesheet Reminder",
+            f"Week of {week_start_formatted}",
+            content,
+        ),
+    )
+
+
 def send_password_reset_email(user, reset_url: str) -> bool:
     first_name = user.full_name.split()[0]
     content = f"""
