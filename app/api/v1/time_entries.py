@@ -4,6 +4,7 @@ from datetime import datetime, date, time, timezone, timedelta
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.time_entry import TimeEntry, EntryType
+from app.models.timesheet_submission import TimesheetSubmission
 from app.models.user import User, UserRole
 from uuid import UUID
 from app.schemas.time_entry import (
@@ -23,6 +24,21 @@ def _week_start(d: date) -> date:
 
 
 FUTURE_WEEKS_LIMIT = 4
+
+
+def _check_week_not_submitted(entry_date: date, user: User, db: Session) -> None:
+    if user.is_superuser or user.role == UserRole.admin:
+        return
+    week_start = _week_start(entry_date)
+    submission = db.query(TimesheetSubmission).filter(
+        TimesheetSubmission.user_id == user.id,
+        TimesheetSubmission.week_start == week_start,
+    ).first()
+    if submission:
+        raise HTTPException(
+            status_code=403,
+            detail="This week has been submitted. Contact your admin to make changes.",
+        )
 
 
 def _check_date_allowed(entry_date: date, user: User) -> None:
@@ -54,6 +70,8 @@ def clock_in(
     if open_entry:
         raise HTTPException(status_code=400, detail="Already clocked in")
 
+    _check_week_not_submitted(date.today(), current_user, db)
+
     entry = TimeEntry(
         user_id=current_user.id,
         company_id=current_user.company_id,
@@ -79,6 +97,8 @@ def clock_out(
     ).first()
     if not open_entry:
         raise HTTPException(status_code=400, detail="Not clocked in")
+
+    _check_week_not_submitted(open_entry.clock_in.date(), current_user, db)
 
     open_entry.clock_out = datetime.now(timezone.utc)
     if payload.notes:
@@ -130,6 +150,7 @@ def create_manual_entry(
         raise HTTPException(status_code=400, detail="clock_out must be after clock_in")
 
     _check_date_allowed(payload.clock_in.date(), current_user)
+    _check_week_not_submitted(payload.clock_in.date(), current_user, db)
 
     entry = TimeEntry(
         user_id=current_user.id,
@@ -160,6 +181,8 @@ def update_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
+    _check_week_not_submitted(entry.clock_in.date(), current_user, db)
+
     if payload.clock_in is not None:
         _check_date_allowed(payload.clock_in.date(), current_user)
         entry.clock_in = payload.clock_in
@@ -187,5 +210,8 @@ def delete_entry(
     ).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
+
+    _check_week_not_submitted(entry.clock_in.date(), current_user, db)
+
     db.delete(entry)
     db.commit()
